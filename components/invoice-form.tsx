@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Plus, Trash2, Save, Send } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast"
+import { toast } from "sonner"
 
 interface InvoiceItem {
   id: string
@@ -43,7 +43,6 @@ export default function InvoiceForm() {
   const [databaseReady, setDatabaseReady] = useState(false)
 
   const router = useRouter()
-  const { toast } = useToast()
   const supabase = createClient()
 
   useEffect(() => {
@@ -60,16 +59,12 @@ export default function InvoiceForm() {
       const errorMessage = error instanceof Error ? error.message : String(error)
       if (errorMessage.includes("table") && errorMessage.includes("not found")) {
         setDatabaseReady(false)
-        toast({
-          title: "Database Setup Required",
+        toast.error("Database Setup Required", {
           description: "Please run the database setup scripts to create the required tables.",
-          variant: "destructive",
         })
       } else {
-        toast({
-          title: "Database Connection Error",
+        toast.error("Database Connection Error", {
           description: "There was an issue connecting to the database. Please try again.",
-          variant: "destructive",
         })
       }
       setInvoiceNumber("INV-0001")
@@ -160,19 +155,15 @@ export default function InvoiceForm() {
 
   const saveInvoice = async (status: "draft" | "sent") => {
     if (!databaseReady) {
-      toast({
-        title: "Database Setup Required",
+      toast.error("Database Setup Required", {
         description: "Please run the database setup scripts before creating invoices.",
-        variant: "destructive",
       })
       return
     }
 
     if (!selectedClientId || !title || items.some((item) => !item.description)) {
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Please fill in all required fields",
-        variant: "destructive",
       })
       return
     }
@@ -182,12 +173,19 @@ export default function InvoiceForm() {
     try {
       const {
         data: { user },
-      } = await supabase.auth.getUser();
-      
+      } = await supabase.auth.getUser()
+
+      if (!user) {
+        toast.error("Authentication Error", {
+          description: "Please log in to create invoices.",
+        })
+        return
+      }
+
       const { data: invoice, error: invoiceError } = await supabase
         .from("invoices")
         .insert({
-          user_id: user?.id,
+          user_id: user.id,
           client_id: selectedClientId,
           invoice_number: invoiceNumber,
           title,
@@ -219,19 +217,15 @@ export default function InvoiceForm() {
 
       if (itemsError) throw itemsError
 
-      toast({
-        title: "Success",
+      toast.success("Success", {
         description: `Invoice ${status === "draft" ? "saved as draft" : "created and sent"}`,
       })
 
       router.push("/dashboard/invoices")
     } catch (error) {
-      debugger;
       console.error("Error saving invoice:", error)
-      toast({
-        title: "Error",
+      toast.error("Error", {
         description: "Failed to save invoice. Please ensure database tables are set up.",
-        variant: "destructive",
       })
     } finally {
       setIsLoading(false)

@@ -1,23 +1,61 @@
-import { createClient } from "@/lib/supabase/server"
+"use client"
+
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, FileText } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Plus, FileText, Search } from "lucide-react"
 import Link from "next/link"
 
-export default async function ProposalsPage() {
-  const supabase = createClient()
+export default function ProposalsPage() {
+  const [proposals, setProposals] = useState([])
+  const [filteredProposals, setFilteredProposals] = useState([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [loading, setLoading] = useState(true)
 
-  const { data: proposals } = await supabase
-    .from("proposals")
-    .select(`
-      *,
-      clients (
-        name,
-        company
+  useEffect(() => {
+    fetchProposals()
+  }, [])
+
+  useEffect(() => {
+    if (searchTerm) {
+      const filtered = proposals.filter(
+        (proposal) =>
+          proposal.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          proposal.clients?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          proposal.clients?.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          proposal.status?.toLowerCase().includes(searchTerm.toLowerCase()),
       )
-    `)
-    .order("created_at", { ascending: false })
+      setFilteredProposals(filtered)
+    } else {
+      setFilteredProposals(proposals)
+    }
+  }, [searchTerm, proposals])
+
+  const fetchProposals = async () => {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from("proposals")
+        .select(`
+          *,
+          clients (
+            name,
+            company
+          )
+        `)
+        .order("created_at", { ascending: false })
+
+      setProposals(data || [])
+      setFilteredProposals(data || [])
+    } catch (error) {
+      console.error("Error fetching proposals:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -36,6 +74,20 @@ export default async function ProposalsPage() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Proposals</h1>
+            <p className="text-gray-600">Manage and track your project proposals</p>
+          </div>
+        </div>
+        <div className="text-center py-12">Loading...</div>
+      </div>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -51,23 +103,40 @@ export default async function ProposalsPage() {
         </Button>
       </div>
 
-      {!proposals || proposals.length === 0 ? (
+      {/* Search Bar */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <Input
+          placeholder="Search proposals..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      {!filteredProposals || filteredProposals.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No proposals yet</h3>
-            <p className="text-gray-500 text-center mb-6">Get started by creating your first proposal</p>
-            <Button asChild className="bg-blue-600 hover:bg-blue-700">
-              <Link href="/dashboard/proposals/new">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Proposal
-              </Link>
-            </Button>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {searchTerm ? "No proposals found" : "No proposals yet"}
+            </h3>
+            <p className="text-gray-500 text-center mb-6">
+              {searchTerm ? `No proposals match "${searchTerm}"` : "Get started by creating your first proposal"}
+            </p>
+            {!searchTerm && (
+              <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                <Link href="/dashboard/proposals/new">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Proposal
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4">
-          {proposals.map((proposal) => (
+          {filteredProposals.map((proposal) => (
             <Card key={proposal.id} className="hover:shadow-md transition-shadow">
               <CardHeader>
                 <div className="flex justify-between items-start">

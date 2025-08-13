@@ -1,23 +1,61 @@
-import { createClient } from "@/lib/supabase/server"
+"use client"
+
+import { useState, useEffect } from "react"
+import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Plus, FileText } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { Plus, FileText, Search } from "lucide-react"
 import Link from "next/link"
 
-export default async function InvoicesPage() {
-  const supabase = createClient()
+export default function InvoicesPage() {
+  const [invoices, setInvoices] = useState([])
+  const [filteredInvoices, setFilteredInvoices] = useState([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [loading, setLoading] = useState(true)
 
-  const { data: invoices } = await supabase
-    .from("invoices")
-    .select(`
-      *,
-      clients (
-        name,
-        company
+  useEffect(() => {
+    fetchInvoices()
+  }, [])
+
+  useEffect(() => {
+    if (searchTerm) {
+      const filtered = invoices.filter(
+        (invoice) =>
+          invoice.invoice_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          invoice.clients?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          invoice.clients?.company?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          invoice.status?.toLowerCase().includes(searchTerm.toLowerCase()),
       )
-    `)
-    .order("created_at", { ascending: false })
+      setFilteredInvoices(filtered)
+    } else {
+      setFilteredInvoices(invoices)
+    }
+  }, [searchTerm, invoices])
+
+  const fetchInvoices = async () => {
+    try {
+      const supabase = createClient()
+      const { data } = await supabase
+        .from("invoices")
+        .select(`
+          *,
+          clients (
+            name,
+            company
+          )
+        `)
+        .order("created_at", { ascending: false })
+
+      setInvoices(data || [])
+      setFilteredInvoices(data || [])
+    } catch (error) {
+      console.error("Error fetching invoices:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -32,6 +70,20 @@ export default async function InvoicesPage() {
       default:
         return "bg-gray-100 text-gray-800"
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Invoices</h1>
+            <p className="text-gray-600">Manage and track your invoices</p>
+          </div>
+        </div>
+        <div className="text-center py-12">Loading...</div>
+      </div>
+    )
   }
 
   return (
@@ -49,23 +101,40 @@ export default async function InvoicesPage() {
         </Button>
       </div>
 
-      {!invoices || invoices.length === 0 ? (
+      {/* Search Bar */}
+      <div className="relative max-w-md">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+        <Input
+          placeholder="Search invoices..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="pl-10"
+        />
+      </div>
+
+      {!filteredInvoices || filteredInvoices.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <FileText className="h-12 w-12 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No invoices yet</h3>
-            <p className="text-gray-500 text-center mb-6">Get started by creating your first invoice</p>
-            <Button asChild className="bg-blue-600 hover:bg-blue-700">
-              <Link href="/dashboard/invoices/new">
-                <Plus className="h-4 w-4 mr-2" />
-                Create Invoice
-              </Link>
-            </Button>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              {searchTerm ? "No invoices found" : "No invoices yet"}
+            </h3>
+            <p className="text-gray-500 text-center mb-6">
+              {searchTerm ? `No invoices match "${searchTerm}"` : "Get started by creating your first invoice"}
+            </p>
+            {!searchTerm && (
+              <Button asChild className="bg-blue-600 hover:bg-blue-700">
+                <Link href="/dashboard/invoices/new">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Invoice
+                </Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       ) : (
         <div className="grid gap-4">
-          {invoices.map((invoice) => (
+          {filteredInvoices.map((invoice) => (
             <Card key={invoice.id} className="hover:shadow-md transition-shadow">
               <CardHeader>
                 <div className="flex justify-between items-start">
