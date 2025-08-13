@@ -107,9 +107,9 @@ export async function POST(request: NextRequest) {
       htmlContent = htmlContent.replace(/{{#if email_signature}}[\s\S]*?{{\/if}}/g, "")
       textContent = textContent.replace(/{{#if email_signature}}[\s\S]*?{{\/if}}/g, "")
     }
-
+    debugger;
     // Use user's API key
-    const userResend = new Resend(settings.resend_api_key)
+    const userResend = new Resend(settings.resend_api_key.trim())
 
     const emailData = {
       from: `${settings.sender_name} <${settings.sender_email}>`,
